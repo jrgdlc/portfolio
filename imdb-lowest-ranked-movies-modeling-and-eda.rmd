@@ -1,0 +1,577 @@
+---
+title: "IMDb Lowest Ranked Movies Modeling and EDA"
+author: "Jorge de la Cruz"
+date: "October 2023"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+    theme: journal
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("broom")
+library(devtools)
+install_url('https://cran.r-project.org/src/contrib/Archive/pbkrtest/pbkrtest_0.4-8.6.tar.gz')
+install_url('https://cran.r-project.org/src/contrib/car_3.1-2.tar.gz')
+```
+
+``` {r setup3, include=FALSE}
+install.packages("lmtest")
+install.packages("leaps")
+install.packages("car")
+install.packages("readr")
+install.packages("tidyverse")
+install.packages("caret")
+install.packages("ggplot2")
+install.packages("dynlm")
+
+```
+
+```{r setup2, include=FALSE}
+library(broom)
+library(car)
+library(lmtest)
+library(leaps)
+library(readr)
+library(tidyverse)
+library(caret)
+library(ggplot2)
+library(dynlm)
+```
+
+## Introduction
+
+This dataset is about IMDb's 100 lowest ranked movies and seems fairly interesting as a project to refresh on some EDA processes and constructing a basic model on what most influences the low rating of these movies. This analysis will be divided into primarily two parts: first, the exploratory data analysis (EDA) where each variable will be examined to better understanding the data; secondly, I will attempt to construct a model about which variables most affect the rating of a bad movie. My hypothesis is that older movies with longer durations and few reviews will likely have more negative reviews.
+
+This dataset was sourced from Kaggle and was originally compiled by Lakshay Jain. Please read the references for further information.
+
+## Exploratory Data Analysis
+
+```{r read csv, message = FALSE}
+df <- read_csv("/kaggle/input/imdb-100-lowest-ranked-movies-dataset/lowest_ranked_movies_data.csv")
+```
+
+In this section, we will use multiple plots and compare the different variables in the data so as to draw general conclusions on the shape and characteristics of the dataset. 
+
+### Variables {.tabset}
+
+The dataset includes the following variables: rank, name, year, certification, duration, rating, review_count, director, writer, genre, and stars. I have decided not to analyze the rank and name of the movies: the ranking of the movies only reflect the opinions of the IMDb columnist, therefore the rating is substantially more significant as an indicator; the name of the movie has no statistical significance but they may be referenced on occassion to advance the analysis. Similarly, the writer, director, and stars variables will not be highly relevant to the analysis I aim to do - these variables could be very useful in a cross-sectional analyses of movie ratings across a writer/director/stars' career but that is not what this analysis intends to do.
+
+Therefore, for our model, we will consider rating, year, certification, duration, review count, and genre. These are a mix of numeric and character class variables thus the analysis into each will be reflect this. Furthermore, it is worth noting that some of the movies are missing data, in particular in the rating and duration variables which will effect the conclusions we can draw and increases the margin of error generally.
+
+#### Rating {.active}
+
+This will be the dependent variable for our model and the basis for most comparisons in the exploratory data analyses. 
+
+The variable "Rating" is the mean user-review rating for the given movie; it normally ranges from 0 to 10 with the latter being the highest possible rating a movie can receive. Nevertheless, the highest rated movie in this dataset sits at a 3.8, with the lowest being a 1.2. The histogram below illustrates the distribution of ratings in the dataset, with a binwidth of 0.25. Thus, the most common rating in the dataset was 3.5 ± 0.125. While this is still very low, it is not as low as I would have expected and the distribution is certainly more top-heavy than I initially hypothesized. Nevertheless, this will still be an interesting variable to model.
+
+
+``` {r rating, echo = FALSE, fig.align='center'}
+rating <- ggplot(df, aes(x=rating)) + 
+  geom_histogram(binwidth = 0.25, colour="black", fill="lightblue")+
+  ggtitle("Histogram of Bad Movies Rating") +
+  xlab("Rating") + ylab("Count")+
+  theme_minimal()
+rating + theme(plot.title = element_text(face="bold", size=14)) + scale_x_continuous(breaks=seq(0,4,0.5))
+```
+
+#### Year
+
+The variable "Year" refers to the year that the movie was first released. The data is displayed in a histogram, with a bin width of 5 years. The data illustrates that most bad movies were released between 2000 and 2010 and there are almost none from before 1980. It is also striking to see that around 2005 there was an abnormally high number of bad movies. There is also a significant number from 2010 and 2020. This may reflect a decrease in movie quality during these decades or, more likely, a greater number of movies being produced and not only by big Hollywood production companies but also independent movie creators.
+
+``` {r years,echo=FALSE, fig.align='center'}
+years <- ggplot(df, aes(x=year)) + 
+  geom_histogram(binwidth = 5, colour="black", fill="lightblue")+
+  ggtitle("Histogram of Bad Movies per Year") +
+  xlab("Year") + ylab("Count")+
+  theme_minimal()
+years + theme(plot.title = element_text(face="bold", size=14)) + scale_x_continuous(breaks=seq(1965,2030,5))
+```
+
+#### Certification {.active}
+
+The variable "Certification" reflects the movie rating that the film received with six possible outcomes: R, TV-MA, PG-13, PG, G, Not Rated. The most common certification among the 100 worst IMDb movies was PG-13. TV-MA stands out for being a television rating rather than a film rating, indicating that these movies did not have a theatrical release.
+
+``` {r certification,echo=FALSE, fig.align='center'}
+cert <- ggplot(df, aes(x=factor(certification)))+
+  geom_bar(stat="count", width=0.7, colour = "black", fill="lightblue")+
+  ggtitle("Plot of Certifications Frequencies") +
+  xlab("Certification") + ylab("Count")+
+  theme_minimal()
+cert + theme(plot.title = element_text(face="bold", size=14))
+```
+
+#### Duration {.active}
+
+The variable "Duration" shows the duration of each film in hours and minutes. This variable is a string which makes it somewhat difficult to analyze and will certainly complicate the model development further on therefore, the following code is to preprocess the data and create a new variable `durationnum` which is a numeric class variable of duration in minutes.
+
+<details>
+  <summary>Click here for String to Numeric conversion</summary>
+
+``` {r duration, fig.width=3, dpi = 300, fig.align='center'}
+library(stringr)
+# Transforming the String into Numeric...
+df$durationhours <- str_replace(df$duration,"1h ", "60")
+df$durationhours <- str_replace(df$durationhours,"2h ", "120")
+df$durationhours <- str_replace(df$durationhours, "m", "")
+df$durationhours <- as.numeric(df$durationhours)
+a <- ifelse(df$durationhours < 1300,
+  hours1 <- substr(df$durationhours, 1, nchar(df$durationhours) - 1), 
+  0)
+b <- ifelse(df$durationhours > 1300,
+  hours2 <- substr(df$durationhours, 1, nchar(df$durationhours) - 2), 
+  0)
+a <- as.numeric(a)
+b <- as.numeric(b)
+c <- a + b
+df$durationhours <- as.numeric(c)
+
+df$durationmins <- str_replace(df$duration, "1h ", "")
+df$durationmins <- str_replace(df$durationmins, "2h ", "")
+df$durationmins <- str_replace(df$durationmins, "m", "")
+df$durationmins <- as.numeric(df$durationmins)
+
+df <- mutate(df, durationnum = durationhours + durationmins)
+
+```
+
+</details> 
+
+
+While there may exist more efficient ways of implementing this change, this method was effective and achieved the needed result. Thus, we now have a new variable to use and conduct analysis on. For the analysis, I used the `library(ggplot2)` to create a scatterplot and smooth best-fit line of `rating` against `durationnum`. Given the very large error bars on the best-fit line, as well as its unusual shape, its safe to say there is not a strong statistical relationship between these two variables in isolation. This is confirmed by the high p-value of the linear regression between these. Aside from this, the scatterplot shows that most bad movies are between 80 and 100 minutes long (or 1h 20m to 1h 40m). 
+
+``` {r duration plot,echo=FALSE, fig.align='center', warning = FALSE, message = FALSE}
+dur <-ggplot(df, aes(x=durationnum, y=rating)) + 
+  geom_point()+
+  geom_smooth()+
+  ggtitle("Bad Movie Duration vs Rating") +
+  xlab("Duration") + ylab("Rating")+
+  theme_minimal()
+dur + theme(plot.title = element_text(face="bold", size=14))
+```
+
+#### Review Count {.active}
+
+The variable "Review Count" shows the number of user reviews a movie received. Similar to duration, this variable was also coded as a string, thus it also had to be converted into numeric. Again, just as with the duration variable, I used a scatterplot and smooth best-fit to analyze the distribution of review counts. As we can see, most bad movies tend towards under 40,000 reviews. The error bars are quite large, especially as the review count increases because there are few movies with very large review counts. Also, given the large distribution of films with ratings that hover around 3.5, my initial hypothesis of believing fewer reviews would lead to worse ratings does not seem to be true. Indeed, the best-fit line seems to be relatively flat, illustrating that there is neither a strong positive or negative relationship between these two variables.
+
+``` {r review_count,echo=FALSE, fig.align='center', warning = FALSE, message = FALSE}
+df$review_count <- str_replace(df$review_count,"K", "000")
+df$review_count <- as.numeric(df$review_count)
+
+dur <-ggplot(df, aes(x=review_count, y=rating)) + 
+  geom_point()+
+  geom_smooth()+
+  ggtitle("Bad Movie Review Count vs Rating") +
+  xlab("Review Count") + ylab("Rating")+
+  theme_minimal()
+dur + theme(plot.title = element_text(face="bold", size=14)) + scale_x_continuous(breaks=seq(0,300000,20000))
+```
+
+#### Genres {.active}
+
+The variable "Genres" shows which genre-categories each film falls under but each film is limited to three. This variable was, again, coded in such a way that made it a little complicated to work with. Therefore, I created a new dataframe for each genre with all the movies falling under that genre included. This could be interesting to run analyses on the individual genres, however, it introduces huge margins of error for the results as some categories contain fewer than 10 movies.
+
+Below, we can see that plot of Rating vs Year by Genre, which is not a great visualization given the number of categories but nonetheless interesting to look at. As we can see, some film genres have a shorter timespan in the chart, others vary wildly between having some of the most popular and least popular, and yet others oscillate between a range. This visualization has enormous margins of errors across the genres due to the relatively small sample size, and the large dips and peaks reveal how there is no clear nor significant trend across any category.
+
+``` {r genre,echo=FALSE, fig.align='center', warning = FALSE, message = FALSE}
+df$Action <- str_count(df$genre, "Action")
+Action <- sum(df$Action)
+Action.rows <- c(df$Action == 0)
+ActionMovies <- df[!Action.rows,]
+
+df$Animation <- str_count(df$genre, "Animation")
+Animation <- sum(df$Animation)
+Animation.rows <- c(df$Animation == 0)
+AnimationMovies <- df[!Animation.rows,]
+
+df$Adventure <- str_count(df$genre, "Adventure")
+Adventure <- sum(df$Adventure)
+Adventure.rows <- c(df$Adventure == 0)
+AdventureMovies <- df[!Adventure.rows,]
+
+df$Comedy <- str_count(df$genre, "Comedy")
+Comedy <- sum(df$Comedy)
+Comedy.rows <- c(df$Comedy == 0)
+ComedyMovies <- df[!Comedy.rows,]
+
+df$Crime <- str_count(df$genre, "Crime")
+Crime <- sum(df$Crime)
+Crime.rows <- c(df$Crime == 0)
+CrimeMovies <- df[!Crime.rows,]
+
+df$Drama <- str_count(df$genre, "Drama")
+Drama <- sum(df$Drama)
+Drama.rows <- c(df$Drama == 0)
+DramaMovies <- df[!Drama.rows,]
+
+df$Fantasy <- str_count(df$genre, "Fantasy")
+Fantasy <- sum(df$Fantasy)
+Fantasy.rows <- c(df$Fantasy == 0)
+FantasyMovies <- df[!Fantasy.rows,]
+
+df$Horror <- str_count(df$genre, "Horror")
+Horror <- sum(df$Horror)
+Horror.rows <- c(df$Horror == 0)
+HorrorMovies <- df[!Horror.rows,]
+
+df$SciFi <- str_count(df$genre, "Sci-Fi")
+SciFi <- sum(df$SciFi)
+SciFi.rows <- c(df$SciFi == 0)
+SciFiMovies <- df[!SciFi.rows,]
+
+df$Thriller <- str_count(df$genre, "Thriller")
+Thriller <- sum(df$Thriller)
+Thriller.rows <- c(df$Thriller == 0)
+ThrillerMovies <- df[!Thriller.rows,]
+
+df$Musical <- str_count(df$genre, "Musical")
+Musical <- sum(df$Musical)
+Musical.rows <- c(df$Musical == 0)
+MusicalMovies <- df[!Musical.rows,]
+
+df$Sport <- str_count(df$genre, "Sport")
+Sport <- sum(df$Sport)
+Sport.rows <- c(df$Sport == 0)
+SportMovies <- df[!Sport.rows,]
+
+df$Family <- str_count(df$genre, "Family")
+Family <- sum(df$Family)
+Family.rows <- c(df$Family == 0)
+FamilyMovies <- df[!Family.rows,]
+
+df$Romance <- str_count(df$genre, "Romance")
+Romance <- sum(df$Romance)
+Romance.rows <- c(df$Romance == 0)
+RomanceMovies <- df[!Romance.rows,]
+
+df$Mystery <- str_count(df$genre, "Mystery")
+Mystery <- sum(df$Mystery)
+Mystery.rows <- c(df$Mystery == 0)
+MysteryMovies <- df[!Mystery.rows,]
+
+
+genres <- data.frame(c(Action, Adventure, Animation, Comedy, Crime, Drama, Fantasy, Horror, SciFi, Thriller, Musical, Sport, Family, Romance, Mystery), row.names = c("Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Fantasy", "Horror", "SciFi", "Thriller", "Musical", "Sport", "Family", "Romance", "Mystery"))
+
+
+
+names(genres)[names(genres) == "c.Action..Adventure..Animation..Comedy..Crime..Drama..Fantasy.."] <- "count"
+
+
+genny <-ggplot(NULL, aes(x=year, y=rating, color = genres)) + 
+  geom_smooth(data = ActionMovies, se = FALSE, aes(color='Action'))+
+  geom_smooth(data = AdventureMovies,  se = FALSE, aes(color='Adventure'))+
+  geom_smooth(data = AnimationMovies,  se = FALSE, aes(color='Animation'))+
+  geom_smooth(data = ComedyMovies, se = FALSE, aes(color='Comedy'))+
+  geom_smooth(data = CrimeMovies, se = FALSE, aes(color='Crime'))+
+  geom_smooth(data = DramaMovies, se = FALSE, aes(color='Drama'))+
+  geom_smooth(data = FamilyMovies, se = FALSE, aes(color='Family'))+
+  geom_smooth(data = FantasyMovies, se = FALSE, aes(color='Fantasy'))+
+  geom_smooth(data = HorrorMovies, se = FALSE, aes(color='Horror'))+
+  geom_smooth(data = MusicalMovies, se = FALSE, aes(color='Musical'))+
+  geom_smooth(data = MysteryMovies, se = FALSE, aes(color='Mystery'))+
+  geom_smooth(data = SciFiMovies, se = FALSE, aes(color='SciFi'))+
+  geom_smooth(data = ThrillerMovies, se = FALSE, aes(color='Thriller'))+  
+  geom_smooth(data = SportMovies, se = FALSE, aes(color='Sport'))+
+  geom_smooth(data = RomanceMovies, se = FALSE, aes(color='Romance'))+
+  ggtitle("Bad Movie Rating vs Year by Genre") +
+  xlab("Year") + ylab("Rating")+
+  scale_color_manual(name='Genre',
+                     breaks=c("Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Fantasy", "Horror", "SciFi", "Thriller",
+                              "Musical", "Sport", "Family", "Romance", "Mystery"),
+                     values=c("Action" = "blue", "Adventure" = "aquamarine", "Animation" = "coral1", "Comedy" = "red", 
+                              "Crime"= "darkorange", "Drama"= "chartreuse", "Fantasy"= "darkorchid", "Horror"= "gray", "SciFi"  = "gold" ,
+                              "Thriller" = "darkseagreen1", "Musical"= "darkolivegreen", "Sport" = "navajowhite2", "Family"= "brown",
+                              "Romance"= "lightgreen", "Mystery"= "cadetblue"))
+genny + theme(plot.title = element_text(face="bold", size=14)) + scale_x_continuous(breaks=seq(1960,2020,5))
+
+```
+
+If we instead run a linear trend to see how they vary, we get the following graph. Again, not very illustrative and closer to some sort of post-modernist art than I would like, but helpful in showing the timespans for each genre more clearly than the previous. 
+
+``` {r genres2, echo=FALSE, fig.align='center', warning = FALSE, message = FALSE}
+genny2 <-ggplot(NULL, aes(x=year, y=rating, color = genres)) + 
+  geom_smooth(method = lm, data = ActionMovies, se = FALSE, aes(color='Action'))+
+  geom_smooth(method = lm, data = AdventureMovies,  se = FALSE, aes(color='Adventure'))+
+  geom_smooth(method = lm,data = AnimationMovies,  se = FALSE, aes(color='Animation'))+
+  geom_smooth(method = lm,data = ComedyMovies, se = FALSE, aes(color='Comedy'))+
+  geom_smooth(method = lm,data = CrimeMovies, se = FALSE, aes(color='Crime'))+
+  geom_smooth(method = lm,data = DramaMovies, se = FALSE, aes(color='Drama'))+
+  geom_smooth(method = lm,data = FamilyMovies, se = FALSE, aes(color='Family'))+
+  geom_smooth(method = lm,data = FantasyMovies, se = FALSE, aes(color='Fantasy'))+
+  geom_smooth(method = lm,data = HorrorMovies, se = FALSE, aes(color='Horror'))+
+  geom_smooth(method = lm,data = MusicalMovies, se = FALSE, aes(color='Musical'))+
+  geom_smooth(method = lm,data = MysteryMovies, se = FALSE, aes(color='Mystery'))+
+  geom_smooth(method = lm,data = SciFiMovies, se = FALSE, aes(color='SciFi'))+
+  geom_smooth(method = lm,data = ThrillerMovies, se = FALSE, aes(color='Thriller'))+  
+  geom_smooth(method = lm,data = SportMovies, se = FALSE, aes(color='Sport'))+
+  geom_smooth(method = lm,data = RomanceMovies, se = FALSE, aes(color='Romance'))+
+  ggtitle("Bad Movie Rating vs Year by Genre") +
+  xlab("Year") + ylab("Rating")+
+  scale_color_manual(name='Genre',
+                     breaks=c("Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Fantasy", "Horror", "SciFi", "Thriller",
+                              "Musical", "Sport", "Family", "Romance", "Mystery"),
+                     values=c("Action" = "blue", "Adventure" = "aquamarine", "Animation" = "coral1", "Comedy" = "red", 
+                              "Crime"= "darkorange", "Drama"= "chartreuse", "Fantasy"= "darkorchid", "Horror"= "gray", "SciFi"  = "gold" ,
+                              "Thriller" = "darkseagreen1", "Musical"= "darkolivegreen", "Sport" = "navajowhite2", "Family"= "brown",
+                              "Romance"= "lightgreen", "Mystery"= "cadetblue"))
+genny2 + theme(plot.title = element_text(face="bold", size=14)) + scale_x_continuous(breaks=seq(1960,2020,5))
+```
+
+
+### EDA Conclusion
+
+With that, we now have a solid understanding of the distribution of each variable and their approximate relationships. Some of these methods were more insightful than others but they nonetheless all provided some reflection of what each variable looks like. There was also some pre-processing involved in order to best suit our needs, but this is to be expected with almost every dataset you would encounter in the wild. Therefore, the Exploratory Data Analysis section of this project is complete!
+
+## Model Development
+
+Given the nature of the data, I would expect a linear model would fall short of significant and likely present very high p-values. Nevertheless, I intend to start with a linear model and build up the model from there.
+
+The linear model will be by quite easy to determine. However, there may be problems with heteroskedasticity in which the case the data may need to be further transformed in order to best suit our needs.
+
+### Initial Regression
+
+For our model, the only viable indicator variables are year, durationnum, review count, certification, and rank. The other variables are encoded in such a way that they do are unusable. Therefore, these variables will be the basis for our analysis of the linear model.
+
+``` {r linear}
+df <- df[complete.cases(df),]
+df.linreg <- lm(rating ~ year + durationnum + review_count + certification + rank , data = df)
+summary(df.linreg)
+```
+
+The linear regression and summary reveal that there are not many statistically significant variables that feed into the rating. Indeed, only rank and the 'Not Rated' certification were significant. The p-values of year, 'PG', 'PG-13', 'R', and 'TV-MA' are particularly concerning as they are all above 0.5. Therefore, the model requires further detailed examination and testing. We will firstly do this by running a Mallows Cp selection algorithm and a Boruta algorithm to compare which variables are most important to our model.
+
+### Identifying Problematic Values
+
+We may see a slight improvement in the model performance by removing any anomalous, high leverage, or very influential observations. These can distort our data and cause issues further on the modeling process. We will identify them through the following residual plots:
+
+``` {r residuals, fig.align='center', warning = FALSE}
+plot(df.linreg)
+```
+
+These residual plots are fairly concerning however, due to the small sample size, not entirely unexpected. Through these plots, I determined that it is worth removing observations 24, 17, and 71 due to being very high leverage on our model. Therefore, I will recalculate without them.
+
+``` {r}
+df.clean <- df[-c(24,17,71),]
+df.newlinreg <- lm(rating ~ year + durationnum + review_count + certification + rank , data = df.clean)
+summary(df.newlinreg)
+```
+
+This was clearly worthwhile as the new linear regression shows! Duration is now a significant variable so removing the problematic values did affect our data. However, we can still improve the model further.
+
+### Variable Selection
+
+``` {r boruta, fig.align = 'center', echo = FALSE, warning = FALSE, message = FALSE}
+library(leaps)
+ss=regsubsets(rating~year + durationnum + review_count + certification + rank, method=c("exhaustive"), nbest=3,data=df.clean)
+
+subsets(ss,statistic = "cp", legend = F, main="Mallows CP", col="steelblue4", ylim = c(0,3))
+
+library(Boruta)
+Bor.res <- Boruta::Boruta(rating~ year + durationnum + review_count + certification + rank, data=df.clean, doTrace=2)
+plot(Bor.res, xlab = "", xaxt="n", main="Boruta Algorithm Feature Importance")
+lz<-lapply(1:ncol(Bor.res$ImpHistory),function(i)
+  Bor.res$ImpHistory[is.finite(Bor.res$ImpHistory[,i]),i])
+names(lz) <- colnames(Bor.res$ImpHistory)
+Labels <- sort(sapply(lz,median))
+axis(side = 1,las=2,labels = names(Labels),
+     at = 1:ncol(Bor.res$ImpHistory), cex.axis = 0.7)
+boruta_signif <- names(Bor.res$finalDecision[Bor.res$finalDecision %in% c("Confirmed", "Tentative")])
+boruta_signif_Conf <- names(Bor.res$finalDecision[Bor.res$finalDecision %in% c("Confirmed")])
+boruta_signif_Tent <- names(Bor.res$finalDecision[Bor.res$finalDecision %in% c("Tentative")])
+boruta_signif_Reject <- names(Bor.res$finalDecision[Bor.res$finalDecision %in% c("Rejected")])
+print(boruta_signif_Conf)
+print(boruta_signif_Tent)
+```
+Mallows Cp calculates that the best variables for our model are duration, review count, rank, and the 'Not Rated' certification. The latter is not a very useful distinction as building a model around only one certification category limits us significantly. In turn, Boruta found that all the variables were relevant to the model, with year being slightly less significant. Therefore, given these results, I am inclined to remove year from the model before moving any further in the analysis.
+
+``` {r}
+df.newlinreg <- lm(rating ~  durationnum + review_count + certification + rank , data = df.clean)
+summary(df.newlinreg)
+```
+
+Without year, the intercept becomes statistically significant. We are making progress towards a more robust model.
+
+### Multicollinearity
+
+In order to ensure that there is no overlap between any of the variables and their effects, I will be using VIF. Should any of the results be over 4, then we will need to edit the model.
+
+``` {r VIF}
+vif(df.newlinreg)
+```
+
+None of the variables have a VIF value over 4, thus there is no significant collinearity between any of the variables.
+
+### Higher degrees
+
+In order to find out if our model requires higher degree exponents on any of the indicators, it is useful to conduct a RESET test. This test will run a hypothesis test where the null hypothesis is that the model does not require any exponents.
+
+``` {r }
+resettest(df.newlinreg, power = 2:3, type = "fitted")
+```
+
+The RESET test produces a value of 0.006 thus we reject the null hypothesis and conclude that higher order variables are significant to our model. Therefore, we will test a higher degree on each numeric variable and use the model with the highest adjusted R^2 value.
+
+<details>
+  <summary>Click here for all model tests and AICs</summary>
+
+``` {r higher models}
+model1 <- lm(rating ~  durationnum + I(durationnum^2) + review_count + certification + rank , data = df.clean)
+summary(model1)
+# 0.8116
+model2 <- lm(rating ~  durationnum + I(durationnum^2) + I(durationnum^3) + review_count + certification + rank , data = df.clean)
+summary(model2)
+# 0.8132
+model3 <- lm(rating ~  durationnum + I(review_count^2) + review_count + certification + rank , data = df.clean)
+summary(model3)
+# 0.8531
+model4 <- lm(rating ~  durationnum + I(review_count^2) + I(review_count^3)+ review_count + certification + rank , data = df.clean)
+summary(model4)
+# 0.8521
+model5 <- lm(rating ~  durationnum + I(rank^2) + review_count + certification + rank , data = df.clean)
+summary(model5)
+# 0.8665
+model6 <- lm(rating ~  durationnum + I(rank^2) + I(rank^3) + review_count + certification + rank , data = df.clean)
+summary(model6)
+# 0.8736
+model7 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^2) + review_count + certification + rank , data = df.clean)
+summary(model7)
+# 0.9089
+model8 <- lm(rating ~  durationnum + I(rank^2) + I(rank^3) + I(review_count^2) + review_count + certification + rank , data = df.clean)
+summary(model8)
+# 0.9162
+model9 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(review_count^2) + review_count + certification + rank , data = df.clean)
+summary(model9)
+# 0.9135
+model10 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + certification + rank , data = df.clean)
+summary(model10)
+# 0.9217
+AIC(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10)
+```
+
+</details> 
+
+We get the highest adjusted R^2 with the most complex model; the cubic of both rank and review_count. It also is the model with the lowest AIC. Therefore, we will be moving forward with the cubic model, `model10`.
+
+### Heteroskedasticity
+
+In the following we will test for heteroskedasticity in the model. Hopefully it is not present.
+
+``` {r heteroskedasticity, fig.align = 'center', echo = FALSE, warning = FALSE, message = FALSE}
+attach(df.clean)
+spreadLevelPlot(model10)
+```
+
+``` {r , echo = FALSE, warning = FALSE, message = FALSE}
+ncvTest(model10)
+bptest(model10)
+```
+
+The p-value for both our Non-constant Variance Score Test and the Breusch-Pagan test are below 0.05, therefore we conclude that heteroskedasticity is present and must therefore edit our model quite heavily. However, to continue and remove heteroskedasticity would mean only including numeric indicators thus we would have to remove `certification` as one of our Xs. Therefore, it will be interesting to compare whether the purely numeric model will be more powerful than our current `model10` as we move forward, despite the problem of heteroskedasticity.
+
+### Robust Standard Errors
+
+To account for heteroskedasticity in our model, I will use Robust Standard Errors together with GLS (unknown form) to improve the model. This will produce unbiased standard errors despite heteroskedasticity being present and non-constant variance. By dropping the assumption that our model must have a constant variance, this technique should produce significant changes in the residual plots and strengthen the model.
+
+``` {r RSE}
+model11 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank , data = df.clean)
+library("sandwich")
+model11.HC0 <- coeftest(model11, vcov = vcovHC(model11, type = "HC0"))
+library(broom)
+tidy(model11.HC0)
+```
+
+With the Robust Standard Errors, we see that all p-values are significant. Therefore, we have accounted for heteroskedasticity. Now we will include these into the model in order to give it more validity.
+
+``` {r}
+ehatsq <- resid(model11)^2
+sighatsq.ols <- lm(log(ehatsq)~log(durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank), data=df.clean)
+vari <- exp(fitted(sighatsq.ols))
+mod.fgls <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank, weights=1/vari, data=df.clean)
+summary(mod.fgls)
+AIC(mod.fgls)
+
+BIC(model10, mod.fgls)
+```
+Interestingly, the results between `mod.fgls` and `model10` are comparable with very similar AICs and adjusted R^2 values. Therefore, I additionally used BIC in this case and found that `mod.fgls` was the preferred option by this metric. Therefore, accounting for heteroskedasticity made a significant difference to our model despite removing the `certification` indicator variable. Finally, we are nearly approaching the final validation of the model. At this point, it may be useful to check for any interaction terms between the variables however, I suspect that the nature of our data does not lend itself to having interactions. But you never know.
+
+### Interaction terms
+
+Interaction terms refer to when two variables are multiplied by each other. This can be quite an arduous process however, I have limited myself to first-order interactions. Therefore, I will not be checking to see if there are higher order interactions however, this could be an avenue for further improvement should it be necessary.
+
+``` {r interactions}
+# Constructing the models for each first-order interaction.
+mod.fgls1 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank), weights=1/vari, data=df.clean)
+mod.fgls2 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*review_count), weights=1/vari, data=df.clean)
+mod.fgls3 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(rank*review_count), weights=1/vari, data=df.clean)
+
+mod.fgls4 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*rank), weights=1/vari, data=df.clean)
+mod.fgls5 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*durationnum), weights=1/vari, data=df.clean)
+
+mod.fgls6 <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*durationnum) + I(rank*review_count), weights=1/vari, data=df.clean)
+```
+
+``` {r interaction results}
+rsquared <- list(summary(mod.fgls1)$adj.r.squared, summary(mod.fgls2)$adj.r.squared, summary(mod.fgls3)$adj.r.squared, summary(mod.fgls4)$adj.r.squared, summary(mod.fgls5)$adj.r.squared, summary(mod.fgls6)$adj.r.squared)
+rs.colnames <- c("mod.fgls1","mod.fgls2","mod.fgls3","mod.fgls4","mod.fgls5","mod.fgls6")
+names(rsquared) <- rs.colnames
+rsquared
+
+AIC(mod.fgls1,mod.fgls2,mod.fgls3,mod.fgls4,mod.fgls5,mod.fgls6)
+BIC(mod.fgls1,mod.fgls2,mod.fgls3,mod.fgls4,mod.fgls5,mod.fgls6)
+```
+
+Given these results, we can conclude that the best suited model is `mod.fgls4` which includes an interaction term of rank and duration as well as rank and review count. When initially constructing the model, I knew from the EDA that the model might be more complex than what I was expecting however, even this was an understatement. Nevertheless, we have reached the final step: cross-validation.
+
+### Cross-Validation
+
+For cross-validation, I will evaluate the model performance by dividing the data into a 2/3 training and 1/3 testing samples and evaluate the out-of-sample performance of the model.
+
+``` {r cross-validation, fig.align = 'center',  warning = FALSE, message = FALSE}
+set.seed(1)
+row.number <- sample(1:nrow(df.clean), 0.667*nrow(df.clean)) 
+train = df.clean[row.number,]
+train.vari = vari[row.number]
+test = df.clean[-row.number,]
+test.vari = vari[-row.number]
+
+mod.fglscv <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*rank), weights=1/train.vari, data=train)
+plot(mod.fglscv)
+tidy(mod.fglscv)
+```
+
+```{r lmvar, include = FALSE}
+library(devtools)
+install_url('https://cran.r-project.org/src/contrib/Archive/lmvar/lmvar_1.5.2.tar.gz')
+```
+
+``` {r MSE}
+library(lmvar)
+
+fit = lm(train$rating ~ durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*rank), weights=1/train.vari,x = TRUE, y = TRUE, data = train)
+cv.lm(fit, k = 3)
+```
+
+With an Root Mean Squared Error (RMSE) of 0.21, our model fits the data fairly well; it is not the best fit but given the limited sample size, this is much better than I expected. However, the small sample size is impacting our model substantially and preventing it from being as robust as I would like. This is particularly noticeable in the residual plots where most points are very high leverage but inevitably so because of the small sample. These methods work best on samples with over 300 observations.
+
+## Conclusion
+
+Our final model was not a linear model. Having cleaned the data, selected for relevant variables, tested for multicollinearity, accounted for higher degrees, adjusted for heteroskedasticity and interaction terms, and finally cross-validated the model, the best fit was a GLS (unknown form) model with Robust Standard Errors. The full model is as follows:
+
+```
+mod.final <- lm(rating ~  durationnum + I(rank^2) + I(review_count^3) + I(rank^3) + I(review_count^2) + review_count + rank + I(durationnum*rank) +I(review_count*rank), weights=1/vari, data=df.clean)
+  ```
+
+I certainly did not expect to go through the entire process when I started the project. However, I have enjoyed refreshing my memory on many of these techniques as this dataset essentially required every single one I have studied thus far. I believe that there is room for improvement, especially with regards to the interaction terms and sample size. Furthermore, much of the preprocessing I suspect could be done much more efficiently. This was also my first time using the `library(ggplots2)` extensively and while I believe these tools are very powerful, there are definitely more robust visualization tools and methods within this package which could better improve the visual clarity of the report.
+
+All in all, I really enjoyed this project and hope that you find it insightful or just entertaining to look through. If you see any room for improvements, please reach out to me for these suggestions!
+
+## References + Further Info.
+
+Dataset Sourced from here: https://www.kaggle.com/datasets/lakshayjain611/imdb-100-lowest-ranked-movies-dataset/data
+
+Thank you to Lakshay Jain for uploading the dataset! 

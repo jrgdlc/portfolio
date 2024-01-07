@@ -1942,6 +1942,61 @@ input, select, textarea {
 		}
 
 /* Main */
+/* Add your styles here */
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.project-carousel {
+    display: flex;
+    overflow-x: auto;
+    gap: 20px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
+}
+
+.project-card {
+    flex: 0 0 auto;
+    width: 300px; /* Adjust the width based on your preference */
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    scroll-snap-align: start;
+    transition: transform 0.3s ease-in-out;
+}
+
+.project-card:hover {
+    transform: scale(1.05);
+}
+
+.project-card img {
+    width: 100%;
+    height: 150px; /* Adjust the height based on your preference */
+    object-fit: cover;
+}
+
+.project-details {
+    padding: 10px;
+}
+
+.project-details h3 {
+    margin-top: 0;
+}
+
+.project-card a {
+    color: #007bff;
+    text-decoration: none;
+    display: block;
+    padding: 10px;
+    text-align: center;
+}
+
+.project-card a:hover {
+    background-color: #f0f0f0;
+}
 
 	#main {
 		position: relative;

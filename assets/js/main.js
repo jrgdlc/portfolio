@@ -5,8 +5,8 @@
 */
 
 function redirectTo(url) {
-    // Open the URL in a new tab or window
-    window.open(url, '_blank');
+    // Change the current window location to the specified URL
+    window.location.href = url;
 }
 
 (function($) {

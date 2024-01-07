@@ -16,7 +16,7 @@
 					<nav id="nav">
 						<a href="#" class="icon solid fa-home"><span>Home</span></a>
 						<a href="#work" class="icon solid fa-folder"><span>Work</span></a>
-						<a href="#contact" class="icon solid fa-envelope"><span>Contact</span></a>
+						<a href="#resume" class="icon solid fa-envelope"><span>Resume</span></a>
 					</nav>
 
 				<!-- Main -->
@@ -47,54 +47,70 @@
 								<section>
 									<div class="project-carousel">
 										<!-- Example of a project card -->
-										<div class="project-card" onclick="redirectTo('https://example.com/project1')">
+										<div class="project-card" onclick="redirectTo('https://jrgdlc.github.io/portfolio/#IMDb')">
 											<img src="images/pic02.jpg" alt="Project 1">
 											<div class="project-details">
-												<h3>Project 1</h3>
-												<p>Description of Project 1</p>
+												<h3>IMDb Worst Movies Analysis</h3>
+												<p>Cross-sectional data analysis and modeling on the 100 worst movies in R</p>
 											</div>
 										</div>
 							
 										<!-- Another example of a project card -->
-										<div class="project-card" onclick="redirectTo('https://example.com/project2')">
+										<div class="project-card" onclick="redirectTo('https://jrgdlc.github.io/portfolio/#Diamonds')">
 											<img src="images/pic01.jpg" alt="Project 2">
 											<div class="project-details">
-												<h3>Project 2</h3>
-												<p>Description of Project 2</p>
+												<h3>Comparative Time-Series Analysis of Prices</h3>
+												<p>Time-series analysis of diamond and gold prices from 2018 to 2021 in R</p>
 											</div>
 										</div>
-										<!-- Add more project cards as needed -->
+										
+										<!-- Another example of a project card -->
+										<div class="project-card" onclick="redirectTo('https://example.com/project2')">
+											<img src="images/pic01.jpg" alt="Project 3">
+											<div class="project-details">
+												<h3>Project 3</h3>
+												<p>Description of Project 3</p>
+											</div>
+										</div>
 									</div>
 								</section>
 							</article>
 
-						<!-- Contact -->
-							<article id="contact" class="panel">
+						<!-- Resume -->
+							<article id="resume" class="panel">
 								<header>
-									<h2>Contact Me</h2>
+									<h2>Resume</h2>
 								</header>
 								<form action="#" method="post">
 									<div>
-										<div class="row">
-											<div class="col-6 col-12-medium">
-												<input type="text" name="name" placeholder="Name" />
-											</div>
-											<div class="col-6 col-12-medium">
-												<input type="text" name="email" placeholder="Email" />
-											</div>
-											<div class="col-12">
-												<input type="text" name="subject" placeholder="Subject" />
-											</div>
-											<div class="col-12">
-												<textarea name="message" placeholder="Message" rows="6"></textarea>
-											</div>
-											<div class="col-12">
-												<input type="submit" value="Send Message" />
-											</div>
-										</div>
+										<iframe src="projects/Resume 2023 (7).pdf" width="100%" height="600px" frameborder="0"></iframe>
 									</div>
 								</form>
 							</article>
+
+						<!-- IMDb -->
+							<article id="IMDb" class="panel">
+								<header>
+									<h2>IMDb Worst Movies</h2>
+								</header>
+								<form action="#" method="post">
+									<div>
+										<iframe src="projects/IMDbBadMovies.html" width="100%" height="600px" frameborder="0"></iframe>
+									</div>
+								</form>
+							</article>
+
+						<!-- Diamonds -->
+							<article id="Diamonds" class="panel">
+								<header>
+									<h2>Time-Series Price Analysis</h2>
+								</header>
+								<form action="#" method="post">
+									<div>
+										<iframe src="projects/Comparative-Time-Analysis.html" width="100%" height="600px" frameborder="0"></iframe>
+									</div>
+								</form>
+							</article>	
 
 					</div>
 

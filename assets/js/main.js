@@ -5,7 +5,7 @@
 */
 
 function redirectTo(url) {
-    // Change the current window location to the specified URL
+    // Change the current window location
     window.location.href = url;
 }
 

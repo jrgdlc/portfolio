@@ -2194,6 +2194,26 @@ input, select, textarea {
 						}
 
 				}
+				#blog {
+					max-width: 800px;
+					margin: 20px auto;
+				}
+				
+				.blog-post {
+					margin-bottom: 30px;
+					padding: 20px;
+					border: 1px solid #ddd;
+					border-radius: 8px;
+				}
+				
+				.blog-post h2 {
+					color: #333;
+				}
+				
+				.post-meta {
+					color: #888;
+					font-size: 0.8em;
+				}
 
 /* Footer */
 

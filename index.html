@@ -191,6 +191,9 @@
 									<h2>Machine Learning Stock Price Forecasting</h2>
 								</header>
 								<p>
+									For the full code, please visit: https://github.com/jrgdlc/Python-GBM-Stock-Price-Forecast/blob/main/StGBM.py 
+								</p>
+								<p>
 									The following video demonstrates how this Python application works for a user:
 								</p>
 								<form action="#" method="post">
@@ -198,6 +201,33 @@
 										<iframe width="100%" height="400" src="https://www.youtube.com/embed/Vsi3NUnGanQ?si=YokNsWyygtwExPK0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 									</div>
 								</form>
+								<p>
+									This financial analysis project revolves around the use of a Gradient Boosting Regression model, a form of machine learning. Before going into further detail below, this program works by firstly fetching realtime data then transforming it so that the model is trained to predict future values instead of current values and outputting this forecast in both a table and graph. It is also important to note that any predictions made by the program should not be taken as financial or investment advice.
+								</p>
+								<p>
+									Firstly, let me explain the model being used. Gradient Boosting Regression models are very powerful yet not all too complicated; they work by creating a large number of simple decision trees which make predictions based on the features, or indicators, they are fed. Individually, these decision trees are not very powerful thus the model will go back and evaluate all of them to see which produces the smallest error relative to the training data. It does this through another decision tree, focusing instead on the errors. With each subsequent decision tree produced, the model will try to minimize the size of the error (residuals) and eventually output a model that best fits the training data. For further information, I found this explanation to be very useful: https://www.geeksforgeeks.org/ml-gradient-boosting/
+								</p>
+								<p>
+									Gradient Boosting Regression models, as you may infer from the name, are typically used for regressions and thus have limited applicability to time-series data but there are ways around this. Usually with regression models, they take a set of indicators and figure out the relationship to the output and then apply it to a set of indicators they have not yet seen:
+								</p>
+								<div style="text-align: center;">
+									<img src="images/yx1.png" alt="Image Description" style="margin: 0 auto; width: 300px; height: 240px;">
+								</div>
+								<p>
+									In the above image, the model would be trained on columns 1 through 4 and then predict y for column 5. However, what happens when we do not have the X's for column 5? Well the model cannot predict something without the necessary inputs. Therefore, if we are trying to predict the future, the typical regression approach will not work. So in order to account for this, we will have to add autoregressive effects into the model meaning that we have to consider time.
+								</p>
+								<div style="text-align: center;">
+									<img src="images/yx2.png" alt="Image Description" style="margin: 0 auto; width: 300px; height: 200px;">
+								</div>
+								<p>
+									The solution is to, as shown above, shift our y variable to the left. In this case, the model will be trained to use the current indicators to predict the future output. So when we give it today's inputs, it gives us a prediction for tomorrow's output. This is the heart of the problem and was quite challenging to figure out but is a very useful solution when we have a wealth of data and are predicting only a short timespan; generally, the further removed the inputs are from the output, the less reliable our model will be.
+								</p>
+								<p>
+									This project also prioritized user interaction and usability thus all the major inputs into the model are chosen by the user. This is possible due to the Polygon.ai stock API which fetches realtime data for any stock but due to this, I am unable to host the application live as it requires the input of an API key which should not be shared publicly. The only area which the user does not directly affect is the adjustment of hyperparameters. This is an essential part of any machine learning process and it essentially defines how well the model will fit the data so this is all adjusted automatically within the program however, it is also it's biggest bottleneck and slows down the runtime significantly (as is evidenced in the video above).
+								</p>
+								<p>
+									The frontend of this application was developed using the streamlit package in Python, which made development and usability much easier. Again, due to the problem with the API key, I could not deploy it to streamlit to have it hosted there. The repository for this project is public on my GitHub profile so please take time to look through it, use it yourself, and potentially add-on to it! As I stated previously, this method is not optimal however, it is a very interesting use-case for this type of model - if you find anything that can be improved please let me know.
+								</p>
 							</article>	
 
 					</div>
